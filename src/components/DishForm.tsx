@@ -1,20 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Dish, Ingredient } from '../types';
 import { Plus, Trash2, Save, X } from 'lucide-react';
 
 interface DishFormProps {
   dish?: Dish;
-  onSave: (dish: Omit<Dish, 'id'>) => void;
+  onSubmit: (dish: Omit<Dish, 'id' | 'createdAt'>) => void;
   onCancel: () => void;
 }
 
-export default function DishForm({ dish, onSave, onCancel }: DishFormProps) {
+export default function DishForm({ dish, onSubmit, onCancel }: DishFormProps) {
   const [name, setName] = useState(dish?.name || '');
   const [servings, setServings] = useState(dish?.servings || 1);
   const [totalWeight, setTotalWeight] = useState(dish?.totalWeight || '');
-  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snack'>(
-    dish?.mealType || 'breakfast'
-  );
+  const [mealType, setMealType] = useState(dish?.mealType || 'breakfast');
   const [ingredients, setIngredients] = useState<Ingredient[]>(
     dish?.ingredients || [{ name: '', amount: 0, unit: 'g' }]
   );
@@ -54,20 +52,20 @@ export default function DishForm({ dish, onSave, onCancel }: DishFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const validIngredients = ingredients.filter(
       (ingredient) => ingredient.name.trim() && ingredient.amount > 0
     );
-    
+
     const validInstructions = instructions.filter((instruction) => instruction.trim());
 
-    onSave({
+    onSubmit({
       name,
       servings,
       totalWeight,
       mealType,
       ingredients: validIngredients,
-      instructions: validInstructions.length > 0 ? validInstructions : undefined,
+      instructions: validInstructions,
     });
   };
 
@@ -110,13 +108,14 @@ export default function DishForm({ dish, onSave, onCancel }: DishFormProps) {
               </label>
               <select
                 value={mealType}
-                onChange={(e) => setMealType(e.target.value as any)}
+                onChange={(e) => setMealType(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value="breakfast">Breakfast</option>
                 <option value="lunch">Lunch</option>
                 <option value="dinner">Dinner</option>
                 <option value="snack">Snack</option>
+                <option value="">Other</option>
               </select>
             </div>
 

@@ -18,7 +18,9 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const addDish = (dish: Dish) => {
-    setSelectedDishes([...selectedDishes, { dish, people: 1 }]);
+    if (!selectedDishes.some(sd => sd.dish.id === dish.id)) {
+      setSelectedDishes([...selectedDishes, { dish, people: 1 }]);
+    }
   };
 
   const removeDish = (dishId: string) => {
@@ -34,7 +36,7 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
   const filterDishes = (mealType: string | null) => {
     return dishes.filter(d =>
       (mealType === null ? !d.mealType : d.mealType === mealType) &&
-      (d.name && typeof d.name === 'string' ? d.name.toLowerCase().includes(searchTerm.toLowerCase()) : false)
+      (d.name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
     );
   };
 
@@ -73,7 +75,7 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
   };
 
   const handleExportPDF = () => {
-    generatePDF(selectedDishes, 'meal_plan_ingredients.pdf');
+    generatePDF(selectedDishes, `meal_plan_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   return (
@@ -83,7 +85,7 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
           Build Your Meal
         </h2>
         <p className="text-gray-600 max-w-2xl mx-auto">
-          Select dishes from your collection and specify the number of people to automatically calculate ingredients.
+          Select dishes and adjust servings to generate a complete shopping list.
         </p>
       </div>
 
@@ -104,7 +106,7 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-96 overflow-y-auto">
             <DishGroup title="Breakfast" dishes={breakfastDishes} color="text-orange-600" />
             <DishGroup title="Lunch" dishes={lunchDishes} color="text-emerald-600" />
             <DishGroup title="Dinner" dishes={dinnerDishes} color="text-purple-600" />
@@ -124,20 +126,18 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
               {selectedDishes.length > 0 && (
                 <button
                   onClick={handleExportPDF}
-                  className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all"
+                  className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-4 py-2 rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all font-medium"
                 >
                   <Download className="h-5 w-5" />
-                  <span>Export to PDF</span>
+                  <span>Export PDF</span>
                 </button>
               )}
             </div>
 
             {selectedDishes.length === 0 ? (
               <div className="text-center py-12">
-                <div className="text-gray-400 mb-4">
-                  <Calculator className="h-16 w-16 mx-auto" />
-                </div>
-                <p className="text-gray-500">No dishes selected yet. Choose from the available dishes to get started!</p>
+                <Calculator className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-500">No dishes selected. Add from the left panel!</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -146,23 +146,23 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h4 className="font-semibold text-gray-900">{dish.name || 'Unnamed Dish'}</h4>
-                        <p className="text-sm text-gray-500">Original: Serves {dish.servings || 1}</p>
+                        <p className="text-sm text-gray-500">Serves {dish.servings || 1}</p>
                       </div>
                       <button
                         onClick={() => removeDish(dish.id)}
-                        className="text-red-600 hover:text-red-800 font-medium text-sm hover:bg-red-50 px-3 py-1 rounded-lg transition-colors"
+                        className="text-red-600 hover:text-red-800 text-sm hover:bg-red-50 px-3 py-1 rounded-lg"
                       >
                         Remove
                       </button>
                     </div>
 
                     <div className="flex items-center justify-between mb-4">
-                      <span className="font-medium text-gray-700">Number of people:</span>
-                      <div className="flex items-center space-x-3">
+                      <span className="font-medium text-gray-700">People:</span>
+                      <div className="flex items-center space-x-2">
                         <button
                           onClick={() => updatePeopleCount(dish.id, people - 1)}
                           disabled={people <= 1}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded-full transition-colors disabled:opacity-50"
+                          className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
                         >
                           <Minus className="h-4 w-4" />
                         </button>
@@ -170,21 +170,18 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
                           type="number"
                           value={people}
                           onChange={(e) => updatePeopleCount(dish.id, Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-16 text-center font-bold text-lg border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          className="w-16 text-center font-bold border rounded-md px-2 py-1"
                           min="1"
                         />
                         <button
                           onClick={() => updatePeopleCount(dish.id, people + 1)}
-                          className="w-8 h-8 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded-full transition-colors"
+                          className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300"
                         >
                           <Plus className="h-4 w-4" />
                         </button>
                         <select
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val) updatePeopleCount(dish.id, parseInt(val));
-                          }}
-                          className="px-2 py-1 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          onChange={(e) => updatePeopleCount(dish.id, parseInt(e.target.value))}
+                          className="px-2 py-1 border rounded-md text-sm"
                         >
                           <option value="">Bulk</option>
                           <option value="10">10</option>
@@ -196,15 +193,13 @@ export default function MealBuilder({ dishes }: MealBuilderProps) {
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-lg p-3 border border-gray-100">
-                      <h5 className="font-medium text-gray-800 mb-2">Calculated Ingredients:</h5>
-                      <div className="space-y-1">
-                        {calculateIngredientsForPeople(dish, people).map((ingredient, index) => (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span className="text-gray-700">{ingredient.name || 'Unknown Ingredient'}</span>
-                            <span className="text-gray-900 font-medium">
-                              {ingredient.amount.toFixed(1)}{ingredient.unit || ''}
-                            </span>
+                    <div className="bg-white rounded-lg p-3 border">
+                      <h5 className="font-medium text-gray-800 mb-2">Ingredients:</h5>
+                      <div className="space-y-1 text-sm">
+                        {calculateIngredientsForPeople(dish, people).map((ing, i) => (
+                          <div key={i} className="flex justify-between">
+                            <span>{ing.name}</span>
+                            <span className="font-medium">{ing.amount.toFixed(1)} {ing.unit}</span>
                           </div>
                         ))}
                       </div>

@@ -14,8 +14,12 @@ function App() {
 
   // Removed the resetting useEffect to allow persistent changes even if length changes
 
-  const handleAddDish = (dishData: Omit<Dish, 'id'>) => {
-    const newDish: Dish = { ...dishData, id: Date.now().toString() };
+  const handleAddDish = (dishData: Omit<Dish, 'id' | 'createdAt'>) => {
+    const newDish: Dish = {
+      ...dishData,
+      id: Date.now().toString(),
+      createdAt: Date.now(),
+    };
     setDishes([...dishes, newDish]);
   };
 

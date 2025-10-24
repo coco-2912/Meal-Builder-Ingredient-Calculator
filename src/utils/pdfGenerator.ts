@@ -1,70 +1,117 @@
 import { jsPDF } from 'jspdf';
-import { SelectedDish } from '../types';
-import { calculateIngredientsForPeople } from '../utils/calculations';
+import autoTable from 'jspdf-autotable';
+import { SelectedDish } from '../components/MealBuilder';
+import { calculateIngredientsForPeople } from './calculations';
 
-export const generatePDF = (selectedDishes: SelectedDish[], filename: string) => {
-  const doc = new jsPDF();
-  let yOffset = 20;
+export const generatePDF = (selectedDishes: SelectedDish[], filename: string = 'meal_plan.pdf') => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
 
   // Title
-  doc.setFontSize(18);
-  doc.text('Meal Plan Ingredients', 20, yOffset);
-  yOffset += 10;
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Meal Plan & Shopping List', 105, 20, { align: 'center' });
 
-  // Summary
-  doc.setFontSize(12);
-  doc.text(`Total dishes: ${selectedDishes.length}`, 20, yOffset);
-  yOffset += 5;
-  doc.text(`Total people: ${selectedDishes.reduce((sum, sd) => sum + sd.people, 0)}`, 20, yOffset);
-  yOffset += 10;
+  // Generated date
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}`, 105, 28, { align: 'center' });
 
-  // Iterate through each dish
-  selectedDishes.forEach(({ dish, people }) => {
-    // Dish header
+  let startY = 40;
+
+  // Loop through each selected dish
+  selectedDishes.forEach(({ dish, people }, index) => {
+    const calculatedIngredients = calculateIngredientsForPeople(dish, people);
+
+    // Dish Title
     doc.setFontSize(14);
-    doc.text(`${dish.name} (for ${people} people)`, 20, yOffset);
-    yOffset += 10;
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${dish.name || 'Unnamed Dish'}`, 14, startY);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`(for ${people} people)`, 14, startY + 6);
 
-    // Ingredients table
-    const ingredients = calculateIngredientsForPeople(dish, people);
-    const tableData = ingredients.map(ing => [
-      ing.name,
-      `${ing.amount.toFixed(1)}${ing.unit}`
+    // Dish metadata
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(
+      `Original: Serves ${dish.servings || 1} • Total Weight: ${dish.totalWeight || 'N/A'}`,
+      14,
+      startY + 12
+    );
+
+    // Ingredients Table
+    const tableData = calculatedIngredients.map(ing => [
+      ing.name || 'Unknown',
+      `${ing.amount.toFixed(2)} ${ing.unit || ''}`.trim(),
     ]);
 
-    // Simple table rendering
-    doc.setFontSize(10);
-    doc.setLineWidth(0.5);
-    const tableX = 20;
-    const tableWidth = 170;
-    const rowHeight = 8;
-    const colWidths = [100, 70];
-
-    // Draw table header
-    doc.setFillColor(200, 200, 200);
-    doc.rect(tableX, yOffset, tableWidth, rowHeight, 'F');
-    doc.text('Ingredient', tableX + 2, yOffset + 6);
-    doc.text('Amount', tableX + colWidths[0] + 2, yOffset + 6);
-    yOffset += rowHeight;
-
-    // Draw table rows
-    tableData.forEach(row => {
-      doc.rect(tableX, yOffset, colWidths[0], rowHeight);
-      doc.rect(tableX + colWidths[0], yOffset, colWidths[1], rowHeight);
-      doc.text(row[0], tableX + 2, yOffset + 6);
-      doc.text(row[1], tableX + colWidths[0] + 2, yOffset + 6);
-      yOffset += rowHeight;
+    autoTable(doc, {
+      head: [['Ingredient', 'Amount']],
+      body: tableData,
+      startY: startY + 18,
+      theme: 'striped',
+      styles: { fontSize: 9, cellPadding: 2.5 },
+      headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14 },
+      pageBreak: 'auto',
+      rowPageBreak: 'avoid',
     });
 
-    // Draw table border
-    doc.rect(tableX, yOffset - rowHeight * (tableData.length + 1), tableWidth, rowHeight * (tableData.length + 1));
+    // Update startY after table
+    startY = (doc as any).lastAutoTable.finalY + 15;
 
-    yOffset += 10; // Space before next dish
-    if (yOffset > 270) { // Add new page if needed
+    // Add new page if needed
+    if (index < selectedDishes.length - 1 && startY > 250) {
       doc.addPage();
-      yOffset = 20;
+      startY = 20;
     }
   });
 
+  // === Consolidated Shopping List ===
+  const allIngredients: Record<string, { name: string; amount: number; unit: string }> = {};
+
+  selectedDishes.forEach(({ dish, people }) => {
+    calculateIngredientsForPeople(dish, people).forEach(ing => {
+      const key = `${ing.name}-${ing.unit}`;
+      if (!allIngredients[key]) {
+        allIngredients[key] = { name: ing.name, amount: 0, unit: ing.unit };
+      }
+      allIngredients[key].amount += ing.amount;
+    });
+  });
+
+  const consolidated = Object.values(allIngredients).map(item => [
+    item.name,
+    `${item.amount.toFixed(2)} ${item.unit}`.trim(),
+  ]);
+
+  if (consolidated.length > 0) {
+    if (startY > 220) {
+      doc.addPage();
+      startY = 20;
+    }
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Consolidated Shopping List', 14, startY);
+    startY += 10;
+
+    autoTable(doc, {
+      head: [['Item', 'Total Amount']],
+      body: consolidated,
+      startY,
+      theme: 'grid',
+      headStyles: { fillColor: [34, 197, 94], textColor: 255, fontStyle: 'bold' },
+      styles: { fontSize: 10, cellPadding: 3 },
+      margin: { left: 14, right: 14 },
+    });
+  }
+
+  // Save PDF
   doc.save(filename);
 };

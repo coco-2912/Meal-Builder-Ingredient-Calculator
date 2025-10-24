@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/components/DishManager.tsx
+import React, { useState } from 'react';
 import { Dish } from '../types';
 import DishCard from './DishCard';
 import DishForm from './DishForm';
@@ -16,12 +17,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
   const [editingDish, setEditingDish] = useState<Dish | undefined>();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMealType, setSelectedMealType] = useState<string>('all');
-  const [importError, setImportError] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
-  useEffect(() => {
-    setSelectedMealType('all');
-  }, []);
 
   const handleSaveDish = (dishData: Omit<Dish, 'id'>) => {
     if (editingDish) {
@@ -42,97 +38,6 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
     if (window.confirm('Are you sure you want to delete this dish?')) {
       onDeleteDish(id);
     }
-  };
-
-  const handleCsvImport = (file: File) => {
-    setImportError(null);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = event.target?.result;
-        if (typeof data !== 'string') throw new Error('Invalid file content');
-        const lines = data.split(/\r\n|\n/);
-        if (lines.length === 0) throw new Error('CSV file is empty');
-
-        const headers = lines[0].split(',');
-        const requiredHeaders = ['Name', 'Servings', 'Ingredients'];
-        const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-        if (missingHeaders.length > 0) {
-          throw new Error(`Missing required columns: ${missingHeaders.join(', ')}`);
-        }
-
-        const newDishes: Omit<Dish, 'id'>[] = lines.slice(1).map((line, rowIndex) => {
-          if (!line.trim()) return null; // skip empty lines
-          const cols = line.split(',');
-
-          const rowData = headers.reduce((obj, header, i) => {
-            obj[header] = cols[i];
-            return obj;
-          }, {} as any);
-
-          if (!rowData.Name || typeof rowData.Name !== 'string') {
-            throw new Error(`Invalid or missing Name in row ${rowIndex + 2}`);
-          }
-          if (isNaN(parseInt(rowData.Servings)) || parseInt(rowData.Servings) <= 0) {
-            throw new Error(`Invalid or missing Servings in row ${rowIndex + 2}`);
-          }
-
-          let ingredients;
-          try {
-            ingredients = rowData.Ingredients ? JSON.parse(rowData.Ingredients) : [];
-            if (!Array.isArray(ingredients)) throw new Error('Ingredients must be an array');
-            ingredients.forEach((ing: any, index: number) => {
-              if (!ing.name || typeof ing.name !== 'string' || isNaN(ing.amount) || !ing.unit) {
-                throw new Error(`Invalid ingredient format at index ${index} in row ${rowIndex + 2}`);
-              }
-            });
-          } catch (err) {
-            throw new Error(`Invalid Ingredients JSON in row ${rowIndex + 2}: ${(err as Error).message}`);
-          }
-
-          let instructions = [];
-          if (rowData.Instructions) {
-            try {
-              instructions = JSON.parse(rowData.Instructions);
-              if (!Array.isArray(instructions)) throw new Error('Instructions must be an array');
-            } catch (err) {
-              throw new Error(`Invalid Instructions JSON in row ${rowIndex + 2}: ${(err as Error).message}`);
-            }
-          }
-
-          return {
-            name: rowData.Name,
-            servings: parseInt(rowData.Servings) || 1,
-            totalWeight: rowData.TotalWeight || 'Unknown',
-            mealType: rowData.MealType as 'breakfast' | 'lunch' | 'dinner' | 'snack' | undefined,
-            ingredients,
-            instructions,
-          };
-        }).filter(Boolean) as Omit<Dish, 'id'>[];
-
-        newDishes.forEach(newDish => {
-          const existingDish = dishes.find(d => d.name.toLowerCase() === newDish.name.toLowerCase());
-          if (existingDish) {
-            onUpdateDish(existingDish.id, newDish);
-          } else {
-            onAddDish(newDish);
-          }
-        });
-
-        setImportError(null);
-        console.log(`Successfully imported ${newDishes.length} dishes`);
-      } catch (err) {
-        const errorMessage = `Failed to import CSV file: ${(err as Error).message}`;
-        setImportError(errorMessage);
-        console.error(errorMessage);
-      }
-    };
-    reader.onerror = () => {
-      const errorMessage = 'Error reading file';
-      setImportError(errorMessage);
-      console.error(errorMessage);
-    };
-    reader.readAsText(file);
   };
 
   const filteredDishes = dishes.filter(dish => {
@@ -162,6 +67,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
           Create, edit, and organize your recipe collection with precise ingredient measurements.
         </p>
       </div>
+
       <div className="flex flex-col md:flex-row gap-4 mb-8 items-center justify-between">
         <div className="flex flex-1 max-w-md relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -173,6 +79,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
         </div>
+
         <div className="flex items-center space-x-4">
           <select
             value={selectedMealType}
@@ -185,6 +92,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
             <option value="dinner">Dinner</option>
             <option value="snack">Snacks</option>
           </select>
+
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
@@ -193,6 +101,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
             <option value="asc">Added: Oldest First</option>
             <option value="desc">Added: Newest First</option>
           </select>
+
           <button
             onClick={() => setShowForm(true)}
             className="flex items-center space-x-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 font-medium"
@@ -200,23 +109,9 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
             <Plus className="h-5 w-5" />
             <span>Add Dish</span>
           </button>
-          <label className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-3 rounded-lg cursor-pointer">
-            <input
-              type="file"
-              accept=".csv"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleCsvImport(file);
-              }}
-              className="hidden"
-            />
-            <span>Import CSV</span>
-          </label>
         </div>
       </div>
-      {importError && (
-        <div className="text-red-600 text-center mb-4">{importError}</div>
-      )}
+
       {sortedDishes.length === 0 ? (
         <div className="text-center py-16">
           <div className="text-gray-400 mb-4">
@@ -228,8 +123,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
           <p className="text-gray-600 mb-6">
             {dishes.length === 0
               ? 'Get started by adding your first dish with all the ingredients and measurements.'
-              : 'Try adjusting your search terms or meal type filter.'
-            }
+              : 'Try adjusting your search terms or meal type filter.'}
           </p>
           {dishes.length === 0 && (
             <button
@@ -252,6 +146,7 @@ export default function DishManager({ dishes, onAddDish, onUpdateDish, onDeleteD
           ))}
         </div>
       )}
+
       {showForm && (
         <DishForm
           dish={editingDish}
